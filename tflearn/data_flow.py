@@ -87,7 +87,7 @@ class FeedDictFlow(DataFlow):
     def __init__(self, feed_dict, coord, batch_size=128, num_threads=8,
                  max_queue=32, shuffle=False, continuous=False,
                  ensure_data_order=False, dprep_dict=None, daug_dict=None,
-                 index_array=None):
+                 index_array=None, balanced_classes = False):
         super(FeedDictFlow, self).__init__(coord, num_threads, max_queue,
                                            shuffle, continuous,
                                            ensure_data_order,
@@ -96,6 +96,7 @@ class FeedDictFlow(DataFlow):
         self.feed_dict = feed_dict
         self.batch_size = batch_size
         self.n_samples = len(utils.get_dict_first_element(feed_dict))
+        self.balanced_classes = balanced_classes
 
         # Queue holding batch ids
         self.batch_ids_queue = queue.Queue(self.max_queue)
@@ -109,8 +110,12 @@ class FeedDictFlow(DataFlow):
             self.n_samples = len(index_array)
 
         # Create batches
-        self.batches = self.make_batches()
-        self.reset_batches()
+        if self.balanced_classes:
+            self.batches = self.make_balanced_batches()
+            self.reset_balanced_batches()
+        else:
+            self.batches = self.make_batches()
+            self.reset_batches()
 
         # Data Recording
         self.data_status = DataFlowStatus(self.batch_size, self.n_samples)
@@ -225,8 +230,19 @@ class FeedDictFlow(DataFlow):
             self.batches = self.make_batches()
         self.batch_index = -1
 
+    def reset_balanced_batches(self):
+        if self.shuffle:
+            self.shuffle_samples()
+            # Generate new batches
+            self.batches = self.make_balanced_batches()
+        self.batch_index = -1
+
     def make_batches(self):
         return utils.make_batches(self.n_samples, self.batch_size)
+
+    def make_balanced_batches(self):
+        return utils.make_balanced_batches(self.n_samples, self.batch_size, 
+                self.feed_dict.values()[1].argmax(1))
 
     def shuffle_samples(self):
         np.random.shuffle(self.index_array)

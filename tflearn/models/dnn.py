@@ -48,7 +48,7 @@ class DNN(object):
 
     def __init__(self, network, clip_gradients=5.0, tensorboard_verbose=0,
                  tensorboard_dir="/tmp/tflearn_logs/", checkpoint_path=None, best_checkpoint_path=None,
-                 max_checkpoints=None, session=None, best_val_accuracy=0.0):
+                 max_checkpoints=None, session=None, best_val_accuracy=0.0, balanced_classes = False):
         assert isinstance(network, tf.Tensor), "'network' arg is not a Tensor!"
         self.net = network
         self.train_ops = tf.get_collection(tf.GraphKeys.TRAIN_OPS)
@@ -88,7 +88,8 @@ class DNN(object):
     def fit(self, X_inputs, Y_targets, n_epoch=10, validation_set=None,
             show_metric=False, batch_size=None, shuffle=None,
             snapshot_epoch=True, snapshot_step=None, excl_trainops=None,
-            validation_batch_size=None, run_id=None, callbacks=[]):
+            validation_batch_size=None, run_id=None, callbacks=[],
+            balanced_classes = False):
         """ Fit.
 
         Train model, feeding X_inputs and Y_targets to the network.
@@ -210,7 +211,8 @@ class DNN(object):
                          daug_dict=daug_dict,
                          excl_trainops=excl_trainops,
                          run_id=run_id,
-                         callbacks=callbacks)
+                         callbacks=callbacks,
+                         balanced_classes = balanced_classes)
 
     def predict(self, X):
         """ Predict.

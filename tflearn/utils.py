@@ -173,6 +173,37 @@ def make_batches(samples_size, batch_size):
     nb_batch = int(np.ceil(samples_size/float(batch_size)))
     return [(i*batch_size, min(samples_size, (i+1)*batch_size)) for i in range(0, nb_batch)]
 
+def make_balanced_batches(samples_size, batch_size, labels):
+    def chunkify(lst, n):
+        return [lst[i::n] for i in xrange(n)]
+
+    import ipdb; ipdb.set_trace()
+
+    nb_batch = int(np.ceil(samples_size/float(batch_size)))
+    l_classes = np.unique(labels)
+    n_classes = len(l_classes)
+    chunks_per_cl = chunkify(batch_size, n_classes)
+
+    for i_batch in range(nb_batch):
+        perm_cl = np.random.permutation(l_classes)
+        l_ind = []
+        for cl in perm_cl:
+            n_chunks = chunks_per_cl[cl]
+            # indexes in the label array corresponding to class cl
+            ind_of_class = np.where(labels == cl)[0]
+            # random permute indexes
+            perm_cl_ind = np.random.permutation(ind_of_class)
+            # and take only n_chunks
+            perm_cl_ind = list(perm_cl_ind[:n_chunks])
+            # if n_chunks not available, keep adding 1 random number at a time until I reac
+            # n_chunks
+            while len(perm_cl_ind) < n_chunks:
+                ind = np.random.permutation(ind_of_class)[0]
+                perm_cl_ind.append(ind)
+            l_ind.append(perm_cl_ind)
+        l_ind = sum(l_ind, [])
+    return 
+
 
 def slice_array(X, start=None, stop=None):
     if type(X) == list:

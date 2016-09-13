@@ -65,9 +65,11 @@ class Trainer(object):
                  tensorboard_verbose=0, checkpoint_path=None, best_checkpoint_path=None,
                  max_checkpoints=None,
                  keep_checkpoint_every_n_hours=10000.0, random_seed=None,
-                 session=None, best_val_accuracy=0.0):
+                 session=None, best_val_accuracy=0.0,
+                 balanced_classes = False):
 
         self.graph = tf.get_default_graph()
+        self.balanced_classes = balanced_classes
         if graph:
             self.graph = graph
 
@@ -149,7 +151,8 @@ class Trainer(object):
 
     def fit(self, feed_dicts, n_epoch=10, val_feed_dicts=None, show_metric=False,
             snapshot_step=None, snapshot_epoch=True, shuffle_all=None,
-            dprep_dict=None, daug_dict=None, excl_trainops=None, run_id=None, callbacks=[]):
+            dprep_dict=None, daug_dict=None, excl_trainops=None, run_id=None, callbacks=[],
+            balanced_classes = False):
         """ fit.
 
         Train network with feeded data dicts.
@@ -209,6 +212,7 @@ class Trainer(object):
         print("---------------------------------")
         print("Run id: " + run_id)
         print("Log directory: " + self.tensorboard_dir)
+        self.balanced_classes = balanced_classes
 
         original_train_ops = list(self.train_ops)
         # Remove excluded train_ops
@@ -250,7 +254,8 @@ class Trainer(object):
                 # Prepare all train_ops for fitting
                 train_op.initialize_fit(feed_dicts[i], vd, dprep_dict,
                                         daug_dict, show_metric,
-                                        self.summ_writer, self.coord)
+                                        self.summ_writer, self.coord,
+                                        balanced_classes = self.balanced_classes)
 
                 # Prepare TermLogger for training diplay
                 metric_term_name = None
@@ -523,13 +528,15 @@ class TrainOp(object):
 
     def __init__(self, loss, optimizer, metric=None, batch_size=64, ema=0.,
                  trainable_vars=None, shuffle=True, step_tensor=None,
-                 validation_monitors=None, validation_batch_size=None, name=None, graph=None):
+                 validation_monitors=None, validation_batch_size=None, name=None, graph=None,
+                 balanced_classes = False):
         self.graph = tf.get_default_graph()
         if graph:
             self.graph = graph
 
         self.name = name
         self.scope_name = name
+        self.balanced_classes= balanced_classes
 
         # Ops
         self.loss = loss
@@ -666,7 +673,7 @@ class TrainOp(object):
                     self.train = tf.no_op(name="train_op_" + str(i))
 
     def initialize_fit(self, feed_dict, val_feed_dict, dprep_dict, daug_dict,
-                       show_metric, summ_writer, coord):
+                       show_metric, summ_writer, coord, balanced_classes = False):
         """ initialize_fit.
 
         Initialize data for feeding the training process. It is meant to
@@ -689,6 +696,7 @@ class TrainOp(object):
         self.feed_dict = feed_dict
         self.val_feed_dict = val_feed_dict
         self.n_train_samples = len(get_dict_first_element(feed_dict))
+        self.balanced_classes = balanced_classes
 
         self.index_array = np.arange(self.n_train_samples)
         self.n_val_samples = 0
@@ -719,7 +727,8 @@ class TrainOp(object):
                                                   daug_dict=daug_dict,
                                                   index_array=self.index_array,
                                                   num_threads=1,
-                                                  shuffle=self.shuffle)
+                                                  shuffle=self.shuffle,
+                                                  balanced_classes = self.balanced_classes)
 
         self.n_batches = len(self.train_dflow.batches)
         self.train_dflow.start()
@@ -731,7 +740,8 @@ class TrainOp(object):
                                                      dprep_dict=dprep_dict,
                                                      daug_dict=None,
                                                      index_array=self.val_index_array,
-                                                     num_threads=1)
+                                                     num_threads=1,
+                                                     balanced_classes = self.balanced_classes)
 
         self.create_testing_summaries(show_metric, self.metric_summ_name,
                                       val_feed_dict)
@@ -822,7 +832,8 @@ class TrainOp(object):
                        batch_size=self.batch_size, ema=self.ema,
                        metric=self.metric,
                        trainable_vars=self.train_vars,
-                       shuffle=self.shuffle)
+                       shuffle=self.shuffle,
+                       balanced_classes = self.balanced_classes)
 
     def create_summaries(self, verbose=2):
         """ Create summaries with `verbose` level """
