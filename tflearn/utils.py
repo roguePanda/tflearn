@@ -171,9 +171,10 @@ def del_duplicated(l):
 
 def make_batches(samples_size, batch_size):
     nb_batch = int(np.ceil(samples_size/float(batch_size)))
-    return [(i*batch_size, min(samples_size, (i+1)*batch_size)) for i in range(0, nb_batch)]
+    return [range(i*batch_size, min(samples_size, (i+1)*batch_size)) for i in range(0, nb_batch)]
 
 def make_balanced_batches(samples_size, batch_size, labels):
+    print("Making balanced batches...")
     def chunkify(lst, n):
         return [lst[i::n] for i in xrange(n)]
     assert(labels.shape[0] == samples_size)
@@ -206,6 +207,7 @@ def make_balanced_batches(samples_size, batch_size, labels):
         assert(len(l_ind) == batch_size)
     l_all_ind = tuple(l_all_ind)
     assert(len(l_all_ind) == nb_batch)
+    print("Done making balanced batches...")
     return l_all_ind
 
 

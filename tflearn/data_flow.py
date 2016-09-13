@@ -203,6 +203,9 @@ class FeedDictFlow(DataFlow):
             ids = self.next_batch_ids()
             if ids is False:
                 break
+            labels = self.feed_dict.values()[1][ids].argmax(1)
+            assert(len(ids) == self.batch_size)
+            #print("Labels for this batch: ", labels)
             self.batch_ids_queue.put(ids)
 
     def next_batch_ids(self):
