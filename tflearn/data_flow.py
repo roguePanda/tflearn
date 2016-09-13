@@ -95,6 +95,7 @@ class FeedDictFlow(DataFlow):
                                            daug_dict)
         self.feed_dict = feed_dict
         self.batch_size = batch_size
+
         self.n_samples = len(utils.get_dict_first_element(feed_dict))
         self.balanced_classes = balanced_classes
 
@@ -211,10 +212,15 @@ class FeedDictFlow(DataFlow):
             if not self.continuous:
                 self.stop()
                 return False
-            self.reset_batches()
+            if self.balanced_classes:
+                self.reset_balanced_batches()
+            else:
+                self.reset_batches()
+        #batch_start, batch_end = self.batches[self.batch_index]
+        #return self.index_array[batch_start:batch_end]
 
-        batch_start, batch_end = self.batches[self.batch_index]
-        return self.index_array[batch_start:batch_end]
+        ind = np.array(self.batches[self.batch_index])
+        return self.index_array[ind]
 
     def retrieve_data(self, batch_ids):
         feed_batch = {}
@@ -241,8 +247,11 @@ class FeedDictFlow(DataFlow):
         return utils.make_batches(self.n_samples, self.batch_size)
 
     def make_balanced_batches(self):
-        return utils.make_balanced_batches(self.n_samples, self.batch_size, 
-                self.feed_dict.values()[1].argmax(1))
+        labels = self.feed_dict.values()[1].argmax(1)
+        if self.index_array is not None:
+            labels = labels[self.index_array]
+        return utils.make_balanced_batches(self.n_samples, 
+                self.batch_size, labels)
 
     def shuffle_samples(self):
         np.random.shuffle(self.index_array)

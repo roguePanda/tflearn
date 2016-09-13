@@ -176,9 +176,7 @@ def make_batches(samples_size, batch_size):
 def make_balanced_batches(samples_size, batch_size, labels):
     def chunkify(lst, n):
         return [lst[i::n] for i in xrange(n)]
-
     assert(labels.shape[0] == samples_size)
-
     nb_batch = int(np.ceil(samples_size/float(batch_size)))
     l_classes = np.unique(labels)
     n_classes = len(l_classes)
