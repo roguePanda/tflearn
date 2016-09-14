@@ -107,6 +107,54 @@ class Accuracy(Metric):
 
 accuracy = Accuracy
 
+class Balanced_Accuracy(Metric):
+    """ Balanced_Accuracy.
+
+    Computes the model accuracy.  The target predictions are assumed
+    to be logits. The difference between this and the normal Accuracy class
+    is that this return the mean average accuracy per class, which is 
+    equivalent to the mean diagonal of the confusion matrix.
+
+    If the predictions tensor is 1D (ie shape [?], or [?, 1]), then the 
+    labels are assumed to be binary (cast as float32), and accuracy is
+    computed based on the average number of equal binary outcomes,
+    thresholding predictions on logits > 0.  
+
+    Otherwise, accuracy is computed based on categorical outcomes,
+    and assumes the inputs (both the model predictions and the labels)
+    are one-hot encoded.  tf.argmax is used to obtain categorical
+    predictions, for equality comparison.
+
+    Examples:
+        ```python
+        # To be used with TFLearn estimators
+        acc = Balanced_Accuracy()
+        regression = regression(net, metric=acc)
+        ```
+
+    Arguments:
+        name: The name to display.
+
+    """
+
+    def __init__(self, name=None):
+        super(Balanced_Accuracy, self).__init__(name)
+
+    def build(self, predictions, targets, inputs=None):
+        """ Build accuracy, comparing predictions and targets. """
+        self.built = True
+        pshape = predictions.get_shape()
+        if len(pshape)==1 or (len(pshape)==2 and int(pshape[1])==1):
+            self.name = self.name or "binary_acc"   # clearly indicate binary accuracy being used
+            self.tensor = balanced_binary_accuracy_op(predictions, targets)
+        else:
+            self.name = self.name or "acc"   	    # traditional categorical accuracy
+            self.tensor = balanced_accuracy_op(predictions, targets)
+        # Add a special name to that tensor, to be used by monitors
+        self.tensor.m_name = self.name
+
+balanced_accuracy = Balanced_Accuracy
+
 class Top_k(Metric):
     """ Top-k.
 
@@ -240,6 +288,41 @@ def accuracy_op(predictions, targets):
         acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
     return acc
 
+def balanced_accuracy_op(predictions, targets):
+    """ balanced_accuracy_op.
+
+    An op that calculates mean accuracy, assuming predictiosn are targets
+    are both one-hot encoded.
+
+    Examples:
+        ```python
+        input_data = placeholder(shape=[None, 784])
+        y_pred = my_network(input_data) # Apply some ops
+        y_true = placeholder(shape=[None, 10]) # Labels
+        acc_op = balanced_accuracy_op(y_pred, y_true)
+
+        # Calculate accuracy by feeding data X and labels Y
+        accuracy = sess.run(acc_op, feed_dict={input_data: X, y_true: Y})
+        ```
+
+    Arguments:
+        predictions: `Tensor`.
+        targets: `Tensor`.
+
+    Returns:
+        `Float`. The mean accuracy.
+
+    """
+    if not isinstance(targets, tf.Tensor):
+        raise ValueError("mean_accuracy 'input' argument only accepts type "
+                         "Tensor, '" + str(type(input)) + "' given.")
+
+    with tf.name_scope('Balanced_Accuracy'):
+        conf_mat = tf.contrib.metrics.confusion_matrix(tf.argmax(predictions, 1), 
+                tf.argmax(targets, 1))
+        acc = tf.reduce_mean(tf.cast(tf.diag_part(conf_mat), tf.float32))
+    return acc
+
 
 def binary_accuracy_op(predictions, targets):
     """ binary_accuracy_op.
@@ -271,6 +354,43 @@ def binary_accuracy_op(predictions, targets):
                          "Tensor, '" + str(type(input)) + "' given.")
 
     with tf.name_scope('BinaryAccuracy'):
+        predictions = tf.cast(tf.greater(predictions, 0), tf.float32)
+        correct_pred = tf.equal(predictions, tf.cast(targets, tf.float32))
+        acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    return acc
+
+def balanced_binary_accuracy_op(predictions, targets):
+    """ balanced_binary_accuracy_op.
+
+    An op that calculates mean accuracy, assuming predictions are logits, and
+    targets are binary encoded (and represented as int32).
+
+    Examples:
+        ```python
+        input_data = placeholder(shape=[None, 784])
+        y_pred = my_network(input_data) # Apply some ops
+        y_true = placeholder(shape=[None, 10]) # Labels
+        acc_op = balanced_binary_accuracy_op(y_pred, y_true)
+
+        # Calculate accuracy by feeding data X and labels Y
+        binary_accuracy = sess.run(acc_op, feed_dict={input_data: X, y_true: Y})
+        ```
+
+    Arguments:
+        predictions: `Tensor` of `float` type.
+        targets: `Tensor` of `float` type.
+
+    Returns:
+        `Float`. The mean accuracy.
+
+    """
+    if not isinstance(targets, tf.Tensor):
+        raise ValueError("mean_accuracy 'input' argument only accepts type "
+                         "Tensor, '" + str(type(input)) + "' given.")
+
+    with tf.name_scope('BalancedBinaryAccuracy'):
+        import ipdb; ipdb.set_trace()
+
         predictions = tf.cast(tf.greater(predictions, 0), tf.float32)
         correct_pred = tf.equal(predictions, tf.cast(targets, tf.float32))
         acc = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
