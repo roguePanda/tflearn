@@ -317,10 +317,15 @@ def balanced_accuracy_op(predictions, targets):
         raise ValueError("mean_accuracy 'input' argument only accepts type "
                          "Tensor, '" + str(type(input)) + "' given.")
 
+    n_samples = predictions.shape[0]
     with tf.name_scope('Balanced_Accuracy'):
         conf_mat = tf.contrib.metrics.confusion_matrix(tf.argmax(predictions, 1), 
                 tf.argmax(targets, 1))
-        acc = tf.reduce_mean(tf.cast(tf.diag_part(conf_mat), tf.float32))
+        conf_mat = tf.cast(conf_mat, tf.float32)
+        cm_sum = tf.cast(tf.reduce_sum(conf_mat, 1), tf.float32)
+        diag = tf.cast(tf.diag_part(conf_mat), tf.float32)
+        acc = tf.reduce_mean(tf.div(diag, cm_sum), 0)
+                
     return acc
 
 
