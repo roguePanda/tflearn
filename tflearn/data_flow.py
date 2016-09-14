@@ -203,6 +203,8 @@ class FeedDictFlow(DataFlow):
             ids = self.next_batch_ids()
             if ids is False:
                 break
+            import ipdb; ipdb.set_trace()
+
             self.batch_ids_queue.put(ids)
 
     def next_batch_ids(self):
