@@ -1,4 +1,4 @@
-""" CIFAR-10 Dataset
+""" CIFAR-100 Dataset
 
 Credits: A. Krizhevsky. https://www.cs.toronto.edu/~kriz/cifar.html.
 
@@ -16,27 +16,24 @@ import pickle
 from ..data_utils import to_categorical
 
 
-def load_data(dirname="cifar-10-batches-py", one_hot=False):
-    tarpath = maybe_download("cifar-10-python.tar.gz",
+def load_data(dirname="cifar-100-python", one_hot=False):
+    tarpath = maybe_download("cifar-100-python.tar.gz",
                              "http://www.cs.toronto.edu/~kriz/",
                              dirname)
     X_train = []
     Y_train = []
 
-    if dirname != './cifar-10-batches-py':
-        dirname = os.path.join(dirname, 'cifar-10-batches-py')
-
-    for i in range(1, 6):
-        fpath = os.path.join(dirname, 'data_batch_' + str(i))
+    for i in ["train"]:
+        fpath = os.path.join(dirname, i)
         data, labels = load_batch(fpath)
-        if i == 1:
+        if i == "train":
             X_train = data
             Y_train = labels
         else:
             X_train = np.concatenate([X_train, data], axis=0)
             Y_train = np.concatenate([Y_train, labels], axis=0)
 
-    fpath = os.path.join(dirname, 'test_batch')
+    fpath = os.path.join(dirname, 'test')
     X_test, Y_test = load_batch(fpath)
 
     X_train = np.dstack((X_train[:, :1024], X_train[:, 1024:2048],
@@ -47,8 +44,8 @@ def load_data(dirname="cifar-10-batches-py", one_hot=False):
     X_test = np.reshape(X_test, [-1, 32, 32, 3])
 
     if one_hot:
-        Y_train = to_categorical(Y_train, 10)
-        Y_test = to_categorical(Y_test, 10)
+        Y_train = to_categorical(Y_train, 100)
+        Y_test = to_categorical(Y_test, 100)
 
     return (X_train, Y_train), (X_test, Y_test)
 
@@ -62,7 +59,7 @@ def load_batch(fpath):
             # Python2
             d = pickle.load(f)
     data = d["data"]
-    labels = d["labels"]
+    labels = d["fine_labels"]
     return data, labels
 
 
@@ -71,31 +68,19 @@ def maybe_download(filename, source_url, work_directory):
         os.mkdir(work_directory)
     filepath = os.path.join(work_directory, filename)
     if not os.path.exists(filepath):
-        print("Downloading CIFAR 10, Please wait...")
+        print("Downloading CIFAR 100, Please wait...")
         filepath, _ = urllib.request.urlretrieve(source_url + filename,
-                                                 filepath, reporthook)
+                                                 filepath)
         statinfo = os.stat(filepath)
         print(('Succesfully downloaded', filename, statinfo.st_size, 'bytes.'))
         untar(filepath)
     return filepath
 
-#reporthook from stackoverflow #13881092
-def reporthook(blocknum, blocksize, totalsize):
-    readsofar = blocknum * blocksize
-    if totalsize > 0:
-        percent = readsofar * 1e2 / totalsize
-        s = "\r%5.1f%% %*d / %d" % (
-            percent, len(str(totalsize)), readsofar, totalsize)
-        sys.stderr.write(s)
-        if readsofar >= totalsize: # near the end
-            sys.stderr.write("\n")
-    else: # total size is unknown
-        sys.stderr.write("read %d\n" % (readsofar,))
 
 def untar(fname):
     if (fname.endswith("tar.gz")):
         tar = tarfile.open(fname)
-        tar.extractall(path = '/'.join(fname.split('/')[:-1]))
+        tar.extractall()
         tar.close()
         print("File Extracted in Current Directory")
     else:

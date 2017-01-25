@@ -6,4 +6,13 @@ __pycache__
 build/*
 dist/*
 *~
+<<<<<<< HEAD
 *.swp
+=======
+.cache
+.coverage
+checkpoint
+htmlcov
+mnist
+test*tflearn*
+>>>>>>> tflearn/master

@@ -374,7 +374,7 @@ class ImagePreprocessing(DataPreprocessing):
         return new_batch
 
     # ----------------------------------------------
-    #  Preprocessing Methods (Overwrited from Base)
+    #  Preprocessing Methods (Overwritten from Base)
     # ----------------------------------------------
 
     def add_samplewise_zero_center(self, per_channel=False):
@@ -454,7 +454,7 @@ class ImagePreprocessing(DataPreprocessing):
         self.args.append(None)
 
     # --------------------------------------------------
-    #  Preprocessing Calculation (Overwrited from Base)
+    #  Preprocessing Calculation (Overwritten from Base)
     # --------------------------------------------------
 
     def _samplewise_zero_center(self, batch, per_channel=False):
@@ -475,7 +475,7 @@ class ImagePreprocessing(DataPreprocessing):
         return batch
 
     # --------------------------------------------------------------
-    #  Calulation with Persistent Parameters (Overwrited from Base)
+    #  Calulation with Persistent Parameters (Overwritten from Base)
     # --------------------------------------------------------------
 
     def _compute_global_mean(self, dataset, session, limit=None):

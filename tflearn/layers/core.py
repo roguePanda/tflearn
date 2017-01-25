@@ -143,7 +143,14 @@ def fully_connected(incoming, n_units, activation='linear', bias=True,
     n_inputs = int(np.prod(input_shape[1:]))
 
     # Build variables and inference.
-    with tf.variable_op_scope([incoming], scope, name, reuse=reuse) as scope:
+    # Variable Scope fix for older TF
+    try:
+        vscope = tf.variable_scope(scope, default_name=name, values=[incoming],
+                                   reuse=reuse)
+    except Exception:
+        vscope = tf.variable_op_scope([incoming], scope, name, reuse=reuse)
+
+    with vscope as scope:
         name = scope.name
 
         W_init = weights_init
@@ -172,13 +179,13 @@ def fully_connected(incoming, n_units, activation='linear', bias=True,
 
         inference = tf.matmul(inference, W)
         if b: inference = tf.nn.bias_add(inference, b)
-
-        if isinstance(activation, str):
-            inference = activations.get(activation)(inference)
-        elif hasattr(activation, '__call__'):
-            inference = activation(inference)
-        else:
-            raise ValueError("Invalid Activation.")
+        if activation:
+            if isinstance(activation, str):
+                inference = activations.get(activation)(inference)
+            elif hasattr(activation, '__call__'):
+                inference = activation(inference)
+            else:
+                raise ValueError("Invalid Activation.")
 
         # Track activations.
         tf.add_to_collection(tf.GraphKeys.ACTIVATIONS, inference)
@@ -194,16 +201,25 @@ def fully_connected(incoming, n_units, activation='linear', bias=True,
     return inference
 
 
-def dropout(incoming, keep_prob, name="Dropout"):
+def dropout(incoming, keep_prob, noise_shape=None, name="Dropout"):
     """ Dropout.
 
     Outputs the input element scaled up by `1 / keep_prob`. The scaling is so
     that the expected sum is unchanged.
 
+    By default, each element is kept or dropped independently. If noise_shape
+    is specified, it must be broadcastable to the shape of x, and only dimensions
+    with noise_shape[i] == shape(x)[i] will make independent decisions. For
+    example, if shape(x) = [k, l, m, n] and noise_shape = [k, 1, 1, n], each
+    batch and channel component will be kept independently and each row and column
+    will be kept or not kept together.
+
     Arguments:
         incoming : A `Tensor`. The incoming tensor.
         keep_prob : A float representing the probability that each element
             is kept.
+        noise_shape : A 1-D Tensor of type int32, representing the shape for
+            randomly generated keep/drop flags.
         name : A name for this layer (optional).
 
     References:
@@ -224,10 +240,10 @@ def dropout(incoming, keep_prob, name="Dropout"):
         def apply_dropout():
             if type(inference) in [list, np.array]:
                 for x in inference:
-                    x = tf.nn.dropout(x, keep_prob)
+                    x = tf.nn.dropout(x, keep_prob, noise_shape)
                 return inference
             else:
-                return tf.nn.dropout(inference, keep_prob)
+                return tf.nn.dropout(inference, keep_prob, noise_shape)
 
         is_training = tflearn.get_training_mode()
         inference = tf.cond(is_training, apply_dropout, lambda: inference)
@@ -376,7 +392,14 @@ def single_unit(incoming, activation='linear', bias=True, trainable=True,
     n_inputs = int(np.prod(input_shape[1:]))
 
     # Build variables and inference.
-    with tf.variable_op_scope([incoming], scope, name, reuse=reuse) as scope:
+    # Variable Scope fix for older TF
+    try:
+        vscope = tf.variable_scope(scope, default_name=name, values=[incoming],
+                                   reuse=reuse)
+    except Exception:
+        vscope = tf.variable_op_scope([incoming], scope, name, reuse=reuse)
+
+    with vscope as scope:
         name = scope.name
 
         W = va.variable('W', shape=[n_inputs],
@@ -476,7 +499,14 @@ def highway(incoming, n_units, activation='linear', transform_dropout=None,
     n_inputs = int(np.prod(input_shape[1:]))
 
     # Build variables and inference.
-    with tf.variable_op_scope([incoming], scope, name, reuse=reuse) as scope:
+    # Variable Scope fix for older TF
+    try:
+        vscope = tf.variable_scope(scope, default_name=name, values=[incoming],
+                                   reuse=reuse)
+    except Exception:
+        vscope = tf.variable_op_scope([incoming], scope, name, reuse=reuse)
+
+    with vscope as scope:
         name = scope.name
 
         W_init = weights_init
@@ -623,10 +653,14 @@ def time_distributed(incoming, fn, args=None, scope=None):
 
     input_shape = utils.get_incoming_shape(incoming)
     timestep = input_shape[1]
-    x = tf.split(1, timestep, incoming)
+    x = tf.unpack(incoming, axis=1)
     if scope:
         x = [fn(x[i], scope=scope+'-'+str(i), *args)
              for i in range(timestep)]
     else:
         x = [fn(x[i], *args) for i in range(timestep)]
+    try:
+      x = map(lambda t: tf.reshape(t, [-1, 1]+utils.get_incoming_shape(t)[1:]), x)
+    except:
+      x = list(map(lambda t: tf.reshape(t, [-1, 1]+utils.get_incoming_shape(t)[1:]), x))
     return tf.concat(1, x)

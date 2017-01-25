@@ -7,6 +7,14 @@ from tensorflow.python.training import moving_averages
 import tflearn
 from .. import utils
 from .. import variables as vs
+from ..utils import get_from_module
+
+
+def get(identifier):
+    if hasattr(identifier, '__call__'):
+        return identifier
+    else:
+        return get_from_module(identifier, globals(), 'normalization')
 
 
 def batch_normalization(incoming, beta=0.0, gamma=1.0, epsilon=1e-5,
@@ -48,7 +56,14 @@ def batch_normalization(incoming, beta=0.0, gamma=1.0, epsilon=1e-5,
 
     gamma_init = tf.random_normal_initializer(mean=gamma, stddev=stddev)
 
-    with tf.variable_op_scope([incoming], scope, name, reuse=reuse) as scope:
+    # Variable Scope fix for older TF
+    try:
+        vscope = tf.variable_scope(scope, default_name=name, values=[incoming],
+                                   reuse=reuse)
+    except Exception:
+        vscope = tf.variable_op_scope([incoming], scope, name, reuse=reuse)
+
+    with vscope as scope:
         name = scope.name
         beta = vs.variable('beta', shape=[input_shape[-1]],
                            initializer=tf.constant_initializer(beta),
@@ -71,24 +86,37 @@ def batch_normalization(incoming, beta=0.0, gamma=1.0, epsilon=1e-5,
                                   restore=restore)
         moving_variance = vs.variable('moving_variance',
                                       input_shape[-1:],
+<<<<<<< HEAD
                                       initializer=tf.ones_initializer(),
+=======
+                                      initializer=tf.constant_initializer(1.),
+>>>>>>> tflearn/master
                                       trainable=False,
                                       restore=restore)
 
         # Define a function to update mean and variance
         def update_mean_var():
             mean, variance = tf.nn.moments(incoming, axis)
-            update_moving_mean = moving_averages.assign_moving_average(
-                moving_mean, mean, decay)
-            update_moving_variance = moving_averages.assign_moving_average(
-                moving_variance, variance, decay)
+
+            # Fix TF 0.12
+            try:
+                update_moving_mean = moving_averages.assign_moving_average(
+                    moving_mean, mean, decay, zero_debias=False)
+                update_moving_variance = moving_averages.assign_moving_average(
+                    moving_variance, variance, decay, zero_debias=False)
+            except Exception as e:
+                update_moving_mean = moving_averages.assign_moving_average(
+                    moving_mean, mean, decay)
+                update_moving_variance = moving_averages.assign_moving_average(
+                    moving_variance, variance, decay)
+
             with tf.control_dependencies(
                     [update_moving_mean, update_moving_variance]):
                 return tf.identity(mean), tf.identity(variance)
 
         # Retrieve variable managing training mode
         is_training = tflearn.get_training_mode()
-        mean, var = tf.python.control_flow_ops.cond(
+        mean, var = tf.cond(
             is_training, update_mean_var, lambda: (moving_mean, moving_variance))
 
         try:

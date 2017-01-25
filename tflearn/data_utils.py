@@ -55,7 +55,7 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', padding='post',
 
     Pad each sequence to the same length: the length of the longest sequence.
     If maxlen is provided, any sequence longer than maxlen is truncated to
-    maxlen. Truncation happens off either the beginning or the end (default) 
+    maxlen. Truncation happens off either the beginning or the end (default)
     of the sequence. Supports pre-padding and post-padding (default).
 
     Arguments:
@@ -98,7 +98,7 @@ def pad_sequences(sequences, maxlen=None, dtype='int32', padding='post',
     return x
 
 
-def string_to_semi_redundant_sequences(string, seq_maxlen=25, redun_step=3):
+def string_to_semi_redundant_sequences(string, seq_maxlen=25, redun_step=3, char_idx=None):
     """ string_to_semi_redundant_sequences.
 
     Vectorize a string and returns parsed sequences and targets, along with
@@ -108,14 +108,18 @@ def string_to_semi_redundant_sequences(string, seq_maxlen=25, redun_step=3):
         string: `str`. Lower-case text from input text file.
         seq_maxlen: `int`. Maximum length of a sequence. Default: 25.
         redun_step: `int`. Redundancy step. Default: 3.
+        char_idx: 'dict'. A dictionary to convert chars to positions. Will be automatically generated if None
 
     Returns:
         A tuple: (inputs, targets, dictionary)
     """
 
     print("Vectorizing text...")
-    chars = set(string)
-    char_idx = {c: i for i, c in enumerate(chars)}
+
+    if char_idx is None:
+      char_idx = chars_to_dictionary(string)
+
+    len_chars = len(char_idx)
 
     sequences = []
     next_chars = []
@@ -123,27 +127,35 @@ def string_to_semi_redundant_sequences(string, seq_maxlen=25, redun_step=3):
         sequences.append(string[i: i + seq_maxlen])
         next_chars.append(string[i + seq_maxlen])
 
-    X = np.zeros((len(sequences), seq_maxlen, len(chars)), dtype=np.bool)
-    Y = np.zeros((len(sequences), len(chars)), dtype=np.bool)
+    X = np.zeros((len(sequences), seq_maxlen, len_chars), dtype=np.bool)
+    Y = np.zeros((len(sequences), len_chars), dtype=np.bool)
     for i, seq in enumerate(sequences):
         for t, char in enumerate(seq):
             X[i, t, char_idx[char]] = 1
         Y[i, char_idx[next_chars[i]]] = 1
 
-    print("Text total length: " + str(len(string)))
-    print("Distinct chars: " + str(len(chars)))
-    print("Total sequences: " + str(len(sequences)))
+    print("Text total length: {:,}".format(len(string)))
+    print("Distinct chars   : {:,}".format(len_chars))
+    print("Total sequences  : {:,}".format(len(sequences)))
 
     return X, Y, char_idx
 
 
 def textfile_to_semi_redundant_sequences(path, seq_maxlen=25, redun_step=3,
-                                         to_lower_case=False):
+                                         to_lower_case=False, pre_defined_char_idx=None):
     """ Vectorize Text file """
     text = open(path).read()
     if to_lower_case:
         text = text.lower()
-    return string_to_semi_redundant_sequences(text, seq_maxlen, redun_step)
+    return string_to_semi_redundant_sequences(text, seq_maxlen, redun_step, pre_defined_char_idx)
+
+
+def chars_to_dictionary(string):
+    """ Creates a dictionary char:integer for each unique character """
+    chars = set(string)
+    # sorted tries to keep a consistent dictionary, if you run a second time for the same char set
+    char_idx = {c: i for i, c in enumerate(sorted(chars))}
+    return char_idx
 
 
 def random_sequence_from_string(string, seq_maxlen):
@@ -279,7 +291,7 @@ class VocabularyProcessor(_VocabularyProcessor):
 def build_hdf5_image_dataset(target_path, image_shape, output_path='dataset.h5',
                              mode='file', categorical_labels=True,
                              normalize=True, grayscale=False,
-                             files_extension=None, chunks=True):
+                             files_extension=None, chunks=False):
     """ Build HDF5 Image Dataset.
 
     Build an HDF5 dataset by providing either a root folder or a plain text
@@ -317,7 +329,7 @@ def build_hdf5_image_dataset(target_path, image_shape, output_path='dataset.h5',
 
         # Load HDF5 dataset
         import h5py
-        h5f = h5py.File('dataset.h5', 'w')
+        h5f = h5py.File('dataset.h5', 'r')
         X = h5f['X']
         Y = h5f['Y']
 
@@ -347,8 +359,9 @@ def build_hdf5_image_dataset(target_path, image_shape, output_path='dataset.h5',
         files_extension: `list of str`. A list of allowed image file
             extension, for example ['.jpg', '.jpeg', '.png']. If None,
             all files are allowed.
-        chunks: `bool` or `list of int`. Whether to chunks the dataset or not.
-            Additionaly, a specific shape for each chunk can be provided.
+        chunks: `bool` Whether to chunks the dataset or not. You should use
+            chunking only when you really need it. See HDF5 documentation.
+            If chunks is 'True' a sensitive default will be computed.
 
     """
     import h5py
@@ -375,10 +388,15 @@ def build_hdf5_image_dataset(target_path, image_shape, output_path='dataset.h5',
         if not grayscale else (len(images), image_shape[0], image_shape[1])
     d_labelshape = (len(images), n_classes) \
         if categorical_labels else (len(images), )
-
+    x_chunks = None
+    y_chunks = None
+    if chunks is True:
+        x_chunks = (1,)+ d_imgshape[1:]
+        if len(d_labelshape) > 1:
+            y_chunks = (1,) + d_labelshape[1:]
     dataset = h5py.File(output_path, 'w')
-    dataset.create_dataset('X', d_imgshape, chunks=chunks)
-    dataset.create_dataset('Y', d_labelshape, chunks=chunks)
+    dataset.create_dataset('X', d_imgshape, chunks=x_chunks)
+    dataset.create_dataset('Y', d_labelshape, chunks=y_chunks)
 
     for i in range(len(images)):
         img = load_image(images[i])
@@ -498,7 +516,7 @@ def image_preloader(target_path, image_shape, mode='file', normalize=True,
             images, labels = [], []
             for l in f.readlines():
                 l = l.strip('\n').split()
-                if not files_extension or any(flag in l(0) for flag in files_extension):
+                if not files_extension or any(flag in l[0] for flag in files_extension):
                     if filter_channel:
                         if get_img_channel(l[0]) != 3:
                             continue

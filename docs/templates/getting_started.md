@@ -35,11 +35,11 @@ Here is a list of all currently available layers:
 
 File | Layers
 -----|-------
-[core](http://tflearn.org/layers/core/) | input_data, fully_connected, dropout, custom_layer, reshape, flatten, activation, single_unit, highway, one_hot_encoding
-[conv](http://tflearn.org/layers/conv/) | conv_2d, conv_2d_transpose, max_pool_2d, avg_pool_2d, upsample_2d, conv_1d, max_pool_1d, avg_pool_1d, residual_block, residual_bottleneck, conv_3d, max_pool_3d, avg_pool_3d, highway_conv_2d
+[core](http://tflearn.org/layers/core/) | input_data, fully_connected, dropout, custom_layer, reshape, flatten, activation, single_unit, highway, one_hot_encoding, time_distributed
+[conv](http://tflearn.org/layers/conv/) | conv_2d, conv_2d_transpose, max_pool_2d, avg_pool_2d, upsample_2d, conv_1d, max_pool_1d, avg_pool_1d, residual_block, residual_bottleneck, conv_3d, max_pool_3d, avg_pool_3d, highway_conv_1d, highway_conv_2d, global_avg_pool, global_max_pool
 [recurrent](http://tflearn.org/layers/recurrent/) | simple_rnn, lstm, gru, bidirectionnal_rnn, dynamic_rnn
 [embedding](http://tflearn.org/layers/embedding_ops/) | embedding
-[normalization](http://tflearn.org/layers/normalization/) | batch_normalization, local_response_normalization
+[normalization](http://tflearn.org/layers/normalization/) | batch_normalization, local_response_normalization, l2_normalize
 [merge](http://tflearn.org/layers/merge_ops/) | merge, merge_outputs
 [estimator](http://tflearn.org/layers/estimator/) | regression
 
@@ -50,10 +50,10 @@ Besides layers concept, TFLearn also provides many different ops to be used when
 File | Ops
 -----|----
 [activations](http://tflearn.org/activations) | linear, tanh, sigmoid, softmax, softplus, softsign, relu, relu6, leaky_relu, prelu, elu
-[objectives](http://tflearn.org/objectives) | softmax_categorical_crossentropy, categorical_crossentropy, binary_crossentropy, mean_square, hinge_loss
+[objectives](http://tflearn.org/objectives) | softmax_categorical_crossentropy, categorical_crossentropy, binary_crossentropy, mean_square, hinge_loss, roc_auc_score, weak_cross_entropy_2d
 [optimizers](http://tflearn.org/optimizers) | SGD, RMSProp, Adam, Momentum, AdaGrad, Ftrl, AdaDelta
 [metrics](http://tflearn.org/metrics) | Accuracy, Top_k, R2
-[initializations](http://tflearn.org/initializations) | zeros, uniform, uniform_scaling, normal, truncated_normal
+[initializations](http://tflearn.org/initializations) | zeros, uniform, uniform_scaling, normal, truncated_normal, xavier, variance_scaling
 [losses](http://tflearn.org/losses) | l1, l2
 
 Below are some quick examples:
@@ -160,13 +160,13 @@ To get or set the value of these variables, TFLearn models class implement `get_
 ```python
 input_data = tflearn.input_data(shape=[None, 784])
 fc1 = tflearn.fully_connected(input_data, 64)
-fc2 = tflearn.fully_connected(input_data, 10, activation='softmax')
-net = tflearn.regression(fc1)
+fc2 = tflearn.fully_connected(fc1, 10, activation='softmax')
+net = tflearn.regression(fc2)
 model = DNN(net)
-# Get weights values of fc1
-model.get_weights(fc1.W)
-# Assign new random weights to fc1
-model.set_weights(fc1.W, numpy.random.rand(64, 10))
+# Get weights values of fc2
+model.get_weights(fc2.W)
+# Assign new random weights to fc2
+model.set_weights(fc2.W, numpy.random.rand(64, 10))
 ```
 
 Note that you can also directly use TensorFlow `eval` or `assign` ops to get or set the value of these variables.
@@ -245,12 +245,12 @@ def my_model(x):
 # 2 different computation graphs but sharing the same weights
 with tf.device('/gpu:0'):
     # Force all Variables to reside on the CPU.
-    with tf.arg_ops([tflearn.variables.variable], device='/cpu:0'):
+    with tf.arg_scope([tflearn.variables.variable], device='/cpu:0'):
         model1 = my_model(placeholder_X)
 # Reuse Variables for the next model
 tf.get_variable_scope().reuse_variables()
 with tf.device('/gpu:1'):
-    with tf.arg_ops([tflearn.variables.variable], device='/cpu:0'):
+    with tf.arg_scope([tflearn.variables.variable], device='/cpu:0'):
         model2 = my_model(placeholder_X)
 
 # Model can now be trained by multiple GPUs (see gradient averaging)
@@ -302,10 +302,10 @@ Here is a list of available ops, click on the file for more details:
 File | Ops
 -----|----
 [activations](http://tflearn.org/activations) | linear, tanh, sigmoid, softmax, softplus, softsign, relu, relu6, leaky_relu, prelu, elu
-[objectives](http://tflearn.org/objectives) | softmax_categorical_crossentropy, categorical_crossentropy, binary_crossentropy, mean_square, hinge_loss
+[objectives](http://tflearn.org/objectives) | softmax_categorical_crossentropy, categorical_crossentropy, binary_crossentropy, mean_square, hinge_loss, roc_auc_score, weak_cross_entropy_2d
 [optimizers](http://tflearn.org/optimizers) | SGD, RMSProp, Adam, Momentum, AdaGrad, Ftrl, AdaDelta
 [metrics](http://tflearn.org/metrics) | Accuracy, Top_k, R2
-[initializations](http://tflearn.org/initializations) | zeros, uniform, uniform_scaling, normal, truncated_normal
+[initializations](http://tflearn.org/initializations) | zeros, uniform, uniform_scaling, normal, truncated_normal, xavier, variance_scaling
 [losses](http://tflearn.org/losses) | l1, l2
 
 Note:
@@ -375,7 +375,7 @@ tflearn.is_training(False)
 ### Training Callbacks
 
 During the training cycle, TFLearn gives you the possibility to track and interact with the metrics of the training throughout a set of functions given by the [Callback](https://github.com/tflearn/tflearn/blob/master/tflearn/callbacks.py#L10) interface.
-To simplify the metrics retreivement, each callback method received a [TrainingState](https://github.com/tflearn/tflearn/blob/master/tflearn/helpers/trainer.py#L950) which track the state (e.g. : current epoch, step, batch iteration) and metrics (e.g. : current validation accuracy, global accuracy etc..)
+To simplify the metrics retreivement, each callback method received a [TrainingState](https://github.com/tflearn/tflearn/blob/master/tflearn/helpers/trainer.py#L976) which track the state (e.g. : current epoch, step, batch iteration) and metrics (e.g. : current validation accuracy, global accuracy etc..)
 
 Callback methods which relate to the training cycle : 
 - `on_train_begin(training_state)`
@@ -410,7 +410,7 @@ Then you just need to add it on the `model.fit` call
 ```python
 
 
-monitorCallback = new MonitorCallback(api)
+monitorCallback = MonitorCallback(api) # "api" is your API class
 model = ...
 
 model.fit(..., callbacks=monitorCallback)

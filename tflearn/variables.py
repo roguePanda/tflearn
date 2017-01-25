@@ -74,7 +74,10 @@ def get_all_variables():
         A list of Variables.
 
     """
-    return tf.get_collection(tf.GraphKeys.VARIABLES)
+    try:
+        return tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)
+    except Exception:
+        return tf.get_collection(tf.GraphKeys.VARIABLES)
 
 
 def get_all_trainable_variable():
@@ -102,6 +105,9 @@ def get_layer_variables_by_name(name):
 
     """
     return tf.get_collection(tf.GraphKeys.LAYER_VARIABLES + '/' + name)
+
+# Shortcut
+get_layer_variables = get_layer_variables_by_name
 
 
 def get_value(var, session=None):
@@ -138,7 +144,7 @@ def set_value(var, value, session=None):
     op = tf.assign(var, value=value)
     if not session:
         session = tf.get_default_session()
-    return op.eval(session)
+    return op.eval(session=session)
 
 
 def get_inputs_placeholder_by_name(name):

@@ -6,17 +6,32 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import array_ops
 try:
-    from tensorflow.python.ops.nn import rnn_cell as _rnn_cell
-    from tensorflow.python.ops.nn import rnn as _rnn, bidirectional_rnn as \
-        _brnn, dynamic_rnn as _drnn
+    # Latest TF
+    from tensorflow.contrib import rnn as _rnn_cell
+    from tensorflow.contrib.rnn import static_rnn as _rnn, \
+      static_bidirectional_rnn as _brnn
 except Exception:
-    from tensorflow.models.rnn import rnn_cell as _rnn_cell
-    from tensorflow.models.rnn import rnn as _rnn, bidirectional_rnn as _brnn, \
-        dynamic_rnn as _drnn
+    # TF > 0.10
+    try:
+        from tensorflow.python.ops.rnn import dynamic_rnn as _drnn
+        from tensorflow.python.ops.nn import rnn_cell as _rnn_cell
+        from tensorflow.python.ops.nn import rnn as _rnn, bidirectional_rnn as \
+            _brnn, dynamic_rnn as _drnn
+    # Old TF
+    except Exception:
+        from tensorflow.models.rnn import rnn_cell as _rnn_cell
+        from tensorflow.models.rnn import rnn as _rnn, bidirectional_rnn as _brnn, \
+            dynamic_rnn as _drnn
 try:
-    from tensorflow.python.util.nest import is_sequence
+    # Latest TF
+    from tensorflow.contrib.rnn.nest import is_sequence
 except Exception:
-    is_sequence = _rnn_cell._is_sequence
+    # TF > 0.10
+    try:
+        from tensorflow.python.util.nest import is_sequence
+    # Old TF
+    except Exception:
+        is_sequence = _rnn_cell._is_sequence
 from .. import config
 from .. import utils
 from .. import activations
@@ -40,7 +55,13 @@ def _rnn_template(incoming, cell, dropout=None, return_seq=False,
 
     input_shape = utils.get_incoming_shape(incoming)
 
-    with tf.variable_op_scope([incoming], scope, name) as scope:
+    # Variable Scope fix for older TF
+    try:
+        vscope = tf.variable_scope(scope, default_name=name, values=[incoming])
+    except Exception:
+        vscope = tf.variable_op_scope([incoming], scope, name)
+
+    with vscope as scope:
         name = scope.name
 
         _cell = cell
@@ -353,7 +374,7 @@ def bidirectional_rnn(incoming, rnncell_fw, rnncell_bw, return_seq=False,
 
     input_shape = utils.get_incoming_shape(incoming)
 
-    with tf.variable_op_scope([incoming], scope, name) as scope:
+    with tf.variable_scope(scope, name, values=[incoming]) as scope:
         name = scope.name
 
         # TODO: DropoutWrapper
@@ -394,7 +415,7 @@ def bidirectional_rnn(incoming, rnncell_fw, rnncell_bw, return_seq=False,
         o = outputs if return_seq else outputs[-1]
 
     sfw = states_fw
-    sbw = states_fw
+    sbw = states_bw
 
     # Track output tensor.
     tf.add_to_collection(tf.GraphKeys.LAYER_TENSOR + '/' + name, o)
@@ -652,7 +673,7 @@ class DropoutWrapper(_rnn_cell.RNNCell):
         if (isinstance(output_keep_prob, float) and
                 not (output_keep_prob >= 0.0 and output_keep_prob <= 1.0)):
             raise ValueError(
-                "Parameter input_keep_prob must be between 0 and 1: %d"
+                "Parameter output_keep_prob must be between 0 and 1: %d"
                 % output_keep_prob)
         self._cell = cell
         self._input_keep_prob = input_keep_prob

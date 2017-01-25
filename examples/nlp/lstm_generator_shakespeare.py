@@ -1,19 +1,30 @@
 from __future__ import absolute_import, division, print_function
 
 import os
+import pickle
 from six.moves import urllib
 
 import tflearn
 from tflearn.data_utils import *
 
 path = "shakespeare_input.txt"
+char_idx_file = 'char_idx.pickle'
+
 if not os.path.isfile(path):
     urllib.request.urlretrieve("https://raw.githubusercontent.com/tflearn/tflearn.github.io/master/resources/shakespeare_input.txt", path)
 
 maxlen = 25
 
+char_idx = None
+if os.path.isfile(char_idx_file):
+  print('Loading previous char_idx')
+  char_idx = pickle.load(open(char_idx_file, 'rb'))
+
 X, Y, char_idx = \
-    textfile_to_semi_redundant_sequences(path, seq_maxlen=maxlen, redun_step=3)
+    textfile_to_semi_redundant_sequences(path, seq_maxlen=maxlen, redun_step=3,
+                                         pre_defined_char_idx=char_idx)
+
+pickle.dump(char_idx, open(char_idx_file,'wb'))
 
 g = tflearn.input_data([None, maxlen, len(char_idx)])
 g = tflearn.lstm(g, 512, return_seq=True)
