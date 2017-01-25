@@ -204,7 +204,11 @@ class FeedDictFlow(DataFlow):
             if ids is False:
                 break
             labels = self.feed_dict.values()[1][ids].argmax(1)
-            assert(len(ids) == self.batch_size)
+            try:
+                assert(len(ids) == self.batch_size)
+            except:
+                import ipdb; ipdb.set_trace()
+
             #print("Labels for this batch: ", labels)
             self.batch_ids_queue.put(ids)
 

@@ -187,7 +187,7 @@ def make_balanced_batches(samples_size, batch_size, labels):
     for i_batch in range(nb_batch):
         perm_cl = np.random.permutation(l_classes)
         l_ind = []
-
+        print("Progress: %f" % (i_batch/float(nb_batch)))
         for i_cl, cl in enumerate(perm_cl):
             n_chunks = len(chunks_per_cl[i_cl])
             # indexes in the label array corresponding to class cl

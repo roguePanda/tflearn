@@ -292,6 +292,7 @@ def balanced_accuracy_op(predictions, targets):
     """ balanced_accuracy_op.
 
     An op that calculates mean accuracy, assuming predictiosn are targets
+
     are both one-hot encoded.
 
     Examples:
@@ -319,11 +320,19 @@ def balanced_accuracy_op(predictions, targets):
 
     with tf.name_scope('Balanced_Accuracy'):
         conf_mat = tf.contrib.metrics.confusion_matrix(tf.argmax(predictions, 1), 
-                tf.argmax(targets, 1))
+                                                       tf.argmax(targets, 1))
         conf_mat = tf.cast(conf_mat, tf.float32)
-        cm_sum = tf.cast(tf.reduce_sum(conf_mat, 1), tf.float32)
-        diag = tf.cast(tf.diag_part(conf_mat), tf.float32)
-        acc = tf.reduce_mean(tf.div(diag, cm_sum), 0)
+        cm_sum   = tf.cast(tf.reduce_sum(conf_mat, 1), tf.float32)
+
+        # replace every cm_sum[cm_sum==0] = 1
+        cm_zeros = tf.zeros_like(cm_sum, dtype = tf.float32)
+        cm_bool  = tf.not_equal(cm_zeros, cm_sum)
+        diag     = tf.cast(tf.diag_part(conf_mat), tf.float32)
+
+        diag     = tf.boolean_mask(diag, cm_bool)
+        cm_sum   = tf.boolean_mask(cm_sum, cm_bool)
+
+        acc      = tf.reduce_mean(tf.div(diag, cm_sum), 0)
                 
     return acc
 

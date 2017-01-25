@@ -197,6 +197,8 @@ class DataPreprocessing(object):
         return batch
 
     def _featurewise_zero_center(self, batch):
+        import ipdb; ipdb.set_trace()
+
         for i in range(len(batch)):
             batch[i] -= self.global_mean.value
         return batch
@@ -221,6 +223,9 @@ class DataPreprocessing(object):
     def _compute_global_mean(self, dataset, session, limit=None):
         """ Compute mean of a dataset. A limit can be specified for faster
         computation, considering only 'limit' first elements. """
+        print("MEAN is DONE over ALL CHANNELS")
+        print("MEAN is DONE over ALL CHANNELS")
+        print("MEAN is DONE over ALL CHANNELS")
         _dataset = dataset
         mean = 0.
         if isinstance(limit, int):
